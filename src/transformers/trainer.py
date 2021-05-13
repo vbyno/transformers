@@ -1363,7 +1363,18 @@ class Trainer:
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = torch.load(os.path.join(self.state.best_model_checkpoint, WEIGHTS_NAME), map_location="cpu")
             # If the model is on the GPU, it still works!
-            self.model.load_state_dict(state_dict)
+            load_result = self.model.load_state_dict(state_dict, strict=False)
+            if len(load_result.missing_keys) != 0:
+                if load_result.missing_keys == self.model._keys_to_ignore_on_save:
+                    self.model.tie_weights()
+                else:
+                    logger.warn(
+                        f"There were missing keys in the checkpoint model loaded: {load_result.missing_keys}."
+                    )
+            if len(load_result.unexpected_keys) != 0:
+                logger.warn(
+                    f"There were unexpected keys in the checkpoint model loaded: {load_result.unexpected_keys}."
+                )
 
             if self.deepspeed:
                 self.deepspeed.load_checkpoint(
